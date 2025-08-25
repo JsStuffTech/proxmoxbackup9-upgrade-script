@@ -201,6 +201,29 @@ step_13() {
   fi
 }
 
+step_14() {
+  if ask_run "Step 14: Post-upgrade sanity checks?"; then
+    log "Running Step 14"
+    {
+      echo "=== OS release (expect VERSION_CODENAME=trixie) ==="
+      grep -E 'PRETTY_NAME|VERSION_CODENAME' /etc/os-release
+      echo
+      echo "=== PBS packages (server/client/common should be 9.x on trixie) ==="
+      proxmox-backup-manager versions | grep -E 'proxmox-backup-(server|client|common)'
+      echo
+      echo "=== Services (is-active) ==="
+      systemctl is-active proxmox-backup.service proxmox-backup-proxy.service
+      echo
+      echo "=== APT sources (should reference trixie; enterprise file removed) ==="
+      grep -R . /etc/apt/sources.list{,.d/*} | sed 's/^/SRC: /'
+    } | tee -a "$LOG_FILE"
+    pause_review
+    log "Step 14 complete."
+  else
+    log "Step 14 skipped."
+  fi
+}
+
 run_step() {
   local n="$1"
   CUR_STEP="$n"
@@ -219,6 +242,7 @@ run_step() {
     11) step_11 ;;
     12) step_12 ;;
     13) step_13 ;;
+    14) step_14 ;;
     *) return 1 ;;
   esac
   return 0
@@ -239,7 +263,7 @@ fi
 
 # We need to insert the "Step 6 (checker again)" after step 6 and before step 7.
 # We'll explicitly call step_6b when step==6 finished.
-for (( s=START_STEP; s<=13; s++ )); do
+for (( s=START_STEP; s<=14; s++ )); do
   run_step "$s" || { log "Unknown step $s"; exit 1; }
   # Inject 6b right after 6
   if [[ "$s" -eq 6 ]]; then
